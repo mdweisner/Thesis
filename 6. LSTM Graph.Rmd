@@ -1,0 +1,338 @@
+---
+title: "LSTM Graph"
+author: "Michael Weisner"
+date: "7/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE,warning=FALSE)
+library(tinytex)
+library(kableExtra)
+library(qwraps2)
+library(stringr)
+library(httr)
+library(data.table)
+library(lubridate)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+
+library(tseries)
+library(gridExtra)
+library(forecast)
+library(olsrr)
+
+library(caret)
+library(doMC)
+
+library(lmtest)
+library(sandwich)
+
+library(kableExtra)
+
+
+options(qwraps2_markup = "markdown")
+```
+
+```{r}
+theme_fivethirtyeight_mw <- function(base_size = 12, base_family = "sans") {
+  colors <- deframe(ggthemes::ggthemes_data[["fivethirtyeight"]])
+  (theme_foundation(base_size = base_size, base_family = base_family)
+   + theme(
+     line = element_line(colour = "black"),
+     rect = element_rect(fill = colors["Light Gray"],
+                         linetype = 0, colour = NA),
+     text = element_text(colour = colors["Dark Gray"]),
+     axis.ticks = element_blank(),
+     axis.line = element_blank(),
+     legend.background = element_rect(),
+     legend.position = "bottom",
+     legend.direction = "horizontal",
+     legend.box = "vertical",
+     panel.grid = element_line(colour = NULL),
+     panel.grid.major =
+       element_line(colour = colors["Medium Gray"]),
+     panel.grid.minor = element_blank(),
+     # unfortunately, can't mimic subtitles TODO!
+     plot.title = element_text(hjust = 0, size = rel(1.5), face = "bold"),
+     plot.margin = unit(c(1, 1, 1, 1), "lines"),
+     strip.background = element_rect()))
+}
+```
+
+
+## Data
+
+```{r}
+snp_complete_joined_noNA_noRec <- read_csv("data_inter_intra/JOINED_snp_complete_noNA_noRec_noclose_inter_intra.csv")
+
+snp_complete_noNA_close <- read_csv("data_inter_intra/JOINED_snp_complete_noNA_noRec_close_inter_intra.csv")
+```
+
+
+```{r}
+lagged_data <- snp_complete_joined_noNA_noRec %>%
+  mutate(VIX_lag = lag(VIX_Close, 1)) %>%
+  mutate(ozone_lag = lag(ozone_Daily_8hr_Average_PPM, 1)) %>%
+  mutate(CO_lag = lag(CO_Daily_8hr_Average_PPM, 1)) %>%
+  mutate(Queens_ozone_lag = lag(`Queens Ozone Data`, 1)) %>%
+  mutate(Queens_co_lag = lag(`Queens CO Data`, 1)) %>%
+  mutate(dewpoint_lag = lag(mean_hr_dewpoint_tempF, 1)) %>%
+  mutate(temp_lag = lag(mean_hr_tempF, 1)) %>%
+  mutate(pressure_lag = lag(mean_hr_pressure_psi, 1)) %>%
+  mutate(wind_lag = lag(mean_hr_windspeed_knots, 1)) %>%
+  mutate(precip_lag = lag(mean_hr_precip_in, 1)) %>%
+  mutate(cloud_lag = lag(mean_hr_clouds_percent, 1)) %>%
+  select(-c(pm2.5_Daily_Sum_UGPM3, VIX_Close, ozone_Daily_8hr_Average_PPM, CO_Daily_8hr_Average_PPM, `Queens Ozone Data`, `Queens CO Data`, mean_hr_dewpoint_tempF, mean_hr_tempF, mean_hr_pressure_psi, mean_hr_windspeed_knots, mean_hr_precip_in, mean_hr_clouds_percent))
+
+lagged_data <- lagged_data[complete.cases(lagged_data),]
+```
+
+
+```{r}
+test <- lagged_data[2335:nrow(lagged_data), ] # lagged_data$Date[2335] == "2017-06-23"
+
+test <- test %>%
+  select(-c(week_53, Wednesday))
+
+
+rf_comparisons <- test %>%
+  select(c(Date, Return_perc_interday))
+```
+
+
+
+##### LSTM Graph
+I am reimporting the LSTM model into R for graphing
+```{r}
+lstm_true = read.csv("./LSTM/lstm_true_values.csv")
+
+
+lstm_true = lstm_true %>%
+  select(X0)
+
+colnames(lstm_true) <- "Return_perc_interday"
+
+lstm_pred = read.csv("./LSTM/lstm_predicted_values.csv")
+lstm_pred = lstm_pred %>%
+  select(X0)
+
+colnames(lstm_pred) <- "predictions"
+
+lstm_full <- cbind(lstm_true, lstm_pred)
+
+lstm_full$Date <- rf_comparisons$Date[39:630]
+```
+
+
+```{r}
+#head(lstm_full)
+nrow(lstm_full)
+```
+
+```{r}
+lstm_full_long <- lstm_full %>%
+  gather("key", "value", -Date)
+
+
+lstm_full_long <- lstm_full_long %>%
+  mutate(key = ifelse(key == "Return_perc_interday", "1. True Return %", key)) %>%
+  mutate(key = ifelse(key == "predictions", "2. Predicted Return %", key))
+
+
+library(plyr)
+
+gg_lstm <- ggplot(lstm_full_long) +
+  theme_fivethirtyeight_mw() +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 1, 
+             subset = .(key == '2. Predicted Return %')) +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 0.5, 
+             subset = .(key == '1. True Return %')) +
+  scale_color_manual(values = c("darkgrey", "blue"), labels = c("True Return %", "Predicted Return %")) +
+  xlab("Date") +
+  ylab("Normalized S&P Return Value") +
+  ggtitle("LSTM - Actual vs Predicted S&P 500 Return %")
+gg_lstm 
+
+ggsave(filename = "actualvspredicted_lstm.png", plot = gg_lstm, path = "graphs/", width = 6.5, height = 4, units = "in", dpi = 300)
+```
+
+
+#### Normalized Version
+```{r}
+lstm_true_norm = read.csv("./LSTM/lstm_true_values_normalized.csv")
+lstm_true_norm = lstm_true_norm %>%
+  select(X0)
+
+colnames(lstm_true_norm) <- "Return_perc_interday"
+
+lstm_pred_norm = read.csv("./LSTM/lstm_predicted_values_normalized.csv")
+lstm_pred_norm = lstm_pred_norm %>%
+  select(X0)
+
+colnames(lstm_pred_norm) <- "predictions"
+
+lstm_full_norm <- cbind(lstm_true_norm, lstm_pred_norm)
+
+lstm_full_norm$Date <- rf_comparisons$Date[39:630]
+```
+
+```{r}
+#head(lstm_full_norm)
+nrow(lstm_full_norm)
+```
+
+```{r}
+lstm_full_long_norm <- lstm_full_norm %>%
+  gather("key", "value", -Date)
+
+
+lstm_full_long_norm <- lstm_full_long_norm %>%
+  mutate(key = ifelse(key == "Return_perc_interday", "1. True Return %", key)) %>%
+  mutate(key = ifelse(key == "predictions", "2. Predicted Return %", key))
+
+
+library(plyr)
+
+gg_lstm_norm <- ggplot(lstm_full_long_norm) +
+  theme_fivethirtyeight_mw() +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 1, 
+             subset = .(key == '2. Predicted Return %')) +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 0.5, 
+             subset = .(key == '1. True Return %')) +
+  scale_color_manual(values = c("darkgrey", "blue"), labels = c("True Return %", "Predicted Return %")) +
+  xlab("Date") +
+  ylab("Normalized S&P Return Value") +
+  ggtitle("LSTM - Actual vs Predicted S&P 500 Return %")
+ 
+
+ggsave(filename = "actualvspredicted_lstm_normalized.png", plot = gg_lstm_norm, path = "graphs/", width = 6.5, height = 4, units = "in", dpi = 300)
+
+gg_lstm_norm
+```
+
+
+#### No Scale version
+
+```{r}
+lstm_true_noscale = read.csv("./LSTM/lstm_true_values_noscale.csv")
+lstm_true_noscale = lstm_true_noscale %>%
+  select(X0)
+
+colnames(lstm_true_noscale) <- "Return_perc_interday"
+
+lstm_pred_noscale = read.csv("./LSTM/lstm_predicted_values_noscale.csv")
+lstm_pred_noscale = lstm_pred_noscale %>%
+  select(X0)
+
+colnames(lstm_pred_noscale) <- "predictions"
+
+lstm_full_noscale <- cbind(lstm_true_noscale, lstm_pred_noscale)
+
+lstm_full_noscale$Date <- rf_comparisons$Date[39:630]
+```
+
+```{r}
+#head(lstm_full_noscale)
+nrow(lstm_full_noscale)
+```
+
+```{r}
+lstm_full_long_noscale <- lstm_full_noscale %>%
+  gather("key", "value", -Date)
+
+
+lstm_full_long_noscale <- lstm_full_long_noscale %>%
+  mutate(key = ifelse(key == "Return_perc", "1. True Return %", key)) %>%
+  mutate(key = ifelse(key == "predictions", "2. Predicted Return %", key))
+
+
+library(plyr)
+
+gg_lstm_noscale <- ggplot(lstm_full_long_noscale) +
+  theme_fivethirtyeight_mw() +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 1, 
+             subset = .(key == '2. Predicted Return %')) +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 0.5, 
+             subset = .(key == '1. True Return %')) +
+  scale_color_manual(values = c("darkgrey", "blue"), labels = c("True Return %", "Predicted Return %")) +
+  xlab("Date") +
+  ylab("No Scale S&P Return Value") +
+  ggtitle("LSTM - Actual vs Predicted S&P 500 Return %")
+ 
+
+ggsave(filename = "actualvspredicted_lstm_noscale.png", plot = gg_lstm_noscale, path = "graphs/", width = 6.5, height = 4, units = "in", dpi = 300)
+
+gg_lstm_noscale
+
+```
+
+#### Adjusting Model for Performance
+
+```{r}
+lstm_true_adjusted = read.csv("./LSTM/lstm_true_values_normalized_ADJUSTED_lowrmse.csv")
+lstm_true_adjusted = lstm_true_adjusted %>%
+  select(X0)
+
+colnames(lstm_true_adjusted) <- "Return_perc_interday"
+
+lstm_pred_adjusted = read.csv("./LSTM/lstm_predicted_values_normalized_ADJUSTED_lowrmse.csv")
+lstm_pred_adjusted = lstm_pred_adjusted %>%
+  select(X0)
+
+colnames(lstm_pred_adjusted) <- "predictions"
+
+lstm_full_adjusted <- cbind(lstm_true_adjusted, lstm_pred_adjusted)
+
+lstm_full_adjusted$Date <- rf_comparisons$Date[39:630]
+```
+
+```{r}
+#head(lstm_full_adjusted)
+nrow(lstm_full_adjusted)
+```
+
+```{r}
+lstm_full_long_adjusted <- lstm_full_adjusted %>%
+  gather("key", "value", -Date)
+
+
+lstm_full_long_adjusted <- lstm_full_long_adjusted %>%
+  mutate(key = ifelse(key == "Return_perc_interday", "1. True Return %", key)) %>%
+  mutate(key = ifelse(key == "predictions", "2. Predicted Return %", key))
+
+
+library(plyr)
+
+gg_lstm_adjusted <- ggplot(lstm_full_long_adjusted) +
+  theme_fivethirtyeight_mw() +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 1, 
+             subset = .(key == '2. Predicted Interday Return %')) +
+  geom_line(aes(x=Date, y = value, color = key), alpha = 0.5, 
+             subset = .(key == '1. True Return %')) +
+  scale_color_manual(values = c("darkgrey", "blue"), labels = c("True Return %", "Predicted Interday Return %")) +
+  xlab("Date") +
+  ylab("S&P Return Value") +
+  ggtitle("LSTM - Actual vs Predicted S&P 500 Interday Return %")
+ 
+detach("package:plyr", unload=TRUE)
+
+ggsave(filename = "actualvspredicted_lstm_adjusted.png", plot = gg_lstm_adjusted, path = "graphs/", width = 6.5, height = 4, units = "in", dpi = 300)
+
+gg_lstm_adjusted
+```
+
+Final Val root mean squared error: 0.7845
+
+## RMSE of predicting 0
+```{r}
+lstm_full_adjusted <- lstm_full_adjusted %>%
+  mutate(zero = 0)
+
+RMSE(pred = lstm_full_adjusted$zero, obs = lstm_full_adjusted$Return_perc_interday)
+
+```
+
+Above is the RMSE of predicting 0 every time (0.8046852).

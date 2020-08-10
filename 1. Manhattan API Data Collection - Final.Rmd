@@ -1,0 +1,1193 @@
+---
+title: "Manhattan API Data Collection"
+author: "Michael Weisner"
+date: "3/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE,warning=FALSE)
+library(tinytex)
+library(kableExtra)
+library(qwraps2)
+library(stringr)
+library(jsonlite)
+library(httr)
+library(data.table)
+library(lubridate)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+options(qwraps2_markup = "markdown")
+```
+
+### Basic API Query
+```{r, eval=FALSE}
+test <- GET(paste0("https://aqs.epa.gov/data/api/sampleData/bySite?email=",EPA_EMAIL,"&key=",EPA_KEY,"&param=88502&bdate=20070101&edate=20070131&state=36&county=061&site=0134"))
+
+test_content <- content(test)
+test_data <- rbindlist(test_content$Data, fill = TRUE)
+```
+
+### PM2.5 Hourly Values
+
+
+```{r}
+# API Parameters
+EPA_EMAIL <- Sys.getenv('EPA_EMAIL')
+EPA_KEY <- Sys.getenv('EPA_KEY')
+base_url <- "https://aqs.epa.gov/data/api/sampleData/bySite"
+
+# 2006 Data
+  args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20060101,
+               edate=20061231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+  #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2006_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2006_df, "data/air_data/hourly/pm2.5/pm2.5_2006_hr.csv")
+
+# 2007 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20070101,
+               edate=20071231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2007_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2007_df, "data/air_data/hourly/pm2.5/pm2.5_2007_hr.csv")
+
+# 2008 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20080101,
+               edate=20081231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2008_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2008_df, "data/air_data/hourly/pm2.5/pm2.5_2008_hr.csv")
+
+# 2009 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20090101,
+               edate=20091231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2009_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2009_df, "data/air_data/hourly/pm2.5/pm2.5_2009_hr.csv")
+
+# 2010 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20100101,
+               edate=20101231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2010_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2010_df, "data/air_data/hourly/pm2.5/pm2.5_2010_hr.csv")
+
+# 2011 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20110101,
+               edate=20111231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2011_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2011_df, "data/air_data/hourly/pm2.5/pm2.5_2011_hr.csv")
+
+# 2012 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20120101,
+               edate=20121231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2012_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2012_df, "data/air_data/hourly/pm2.5/pm2.5_2012_hr.csv")
+
+# 2013 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20130101,
+               edate=20131231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2013_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2013_df, "data/air_data/hourly/pm2.5/pm2.5_2013_hr.csv")
+
+# 2014 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20140101,
+               edate=20141231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2014_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2014_df, "data/air_data/hourly/pm2.5/pm2.5_2014_hr.csv")
+
+# 2015 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20150101,
+               edate=20151231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2015_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2015_df, "data/air_data/hourly/pm2.5/pm2.5_2015_hr.csv")
+
+# 2016 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20160101,
+               edate=20161231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2016_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2016_df, "data/air_data/hourly/pm2.5/pm2.5_2016_hr.csv")
+
+# 2017 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20170101,
+               edate=20171231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2017_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2017_df, "data/air_data/hourly/pm2.5/pm2.5_2017_hr.csv")
+
+# 2018 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20180101,
+               edate=20181231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2018_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2018_df, "data/air_data/hourly/pm2.5/pm2.5_2018_hr.csv")
+
+# 2019 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=88502,
+               bdate=20190101,
+               edate=20191231,
+               state="36",
+               county="061",
+               site="0134")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+pm2.5_2019_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = pm2.5_2019_df, "data/air_data/hourly/pm2.5/pm2.5_2019_hr.csv")
+
+# Full Data
+
+pm2.5_2006_2019_df <- do.call("rbind", list(pm2.5_2006_df, pm2.5_2007_df, pm2.5_2008_df, pm2.5_2009_df, pm2.5_2010_df, pm2.5_2011_df, pm2.5_2012_df, pm2.5_2013_df, pm2.5_2014_df, pm2.5_2015_df, pm2.5_2016_df, pm2.5_2017_df, pm2.5_2018_df, pm2.5_2019_df))
+
+pm2.5_2006_2019_df$date_time_local <- ymd_hm(paste(pm2.5_2006_2019_df$date_local, pm2.5_2006_2019_df$time_local), tz="EST")
+
+pm2.5_2006_2019_df$date_time_gmt <- ymd_hm(paste(pm2.5_2006_2019_df$date_gmt, pm2.5_2006_2019_df$time_gmt), tz = "GMT")
+
+pm2.5_2006_2019_df$date_time_gmt2 <- with_tz(pm2.5_2006_2019_df$date_time_local, tzone= "Europe/Athens") # This is Athens Time and is GMT+2
+
+pm2.5_2006_2019_df$date_time_gmt2_value <- paste(pm2.5_2006_2019_df$date_time_gmt2) # backup
+```
+
+#### Create Adjusted PM2.5 Date 
+
+The closing value for a day is reported at 4PM, so we adjust the PM2.5 average for a day to start the day before at 4PM and end the day of at 4PM. We can do this by adjusting the date to GMT + 2 and then removing the timestamp.
+
+```{r}
+pm2.5_2006_2019_df$snp_close_adjusted_date <- NA
+
+for(i in 1:nrow(pm2.5_2006_2019_df)) {
+pm2.5_2006_2019_df$snp_close_adjusted_date[i] <- paste(date(pm2.5_2006_2019_df$date_time_gmt2[i]))
+}
+
+pm2.5_2006_2019_df$snp_close_adjusted_date <- as.Date(pm2.5_2006_2019_df$snp_close_adjusted_date)
+
+write_csv(x = pm2.5_2006_2019_df, "data/air_data/hourly/pm2.5/pm2.5_2006_2019_df.csv")
+```
+
+#### Data Check
+```{r}
+datacheck <- read_csv("data/air_data/hourly/pm2.5/pm2.5_2006_2019_df.csv")
+```
+
+```{r}
+
+pm2.5_2006_2019_df <- read_csv("data/air_data/hourly/pm2.5/pm2.5_2006_2019_df.csv")
+
+full_dates <- seq(as.Date("2006-12-21"), as.Date("2020-01-01"), by="days")
+full_dates <- as.data.frame(full_dates)
+colnames(full_dates)  <- "snp_close_adjusted_date"
+
+full_dates <- left_join(full_dates, pm2.5_2006_2019_df)
+
+#full_dates <- full_dates[-c(1:15),]
+
+sum(is.na(full_dates$sample_measurement))
+```
+
+Between 2006-12-21 and 2020-01-01 I'm missing 4277 hourly measurements of pm2.5.
+
+### Ozone Hourly Values
+
+Daily mean measures of 1-hour ozone
+
+For reference, the current national air quality standard for ozone is 0.08 parts per million (ppm), or 80 parts per billion (ppb), averaged over 8 hours. (NASA, 2003)
+AQI code is 44201.
+
+
+```{r}
+EPA_EMAIL <- Sys.getenv('EPA_EMAIL')
+EPA_KEY <- Sys.getenv('EPA_KEY')
+base_url <- "https://aqs.epa.gov/data/api/sampleData/bySite"
+
+# 2006 Data
+  args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20061220,
+               edate=20061231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+  #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2006_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2006_df, "data/air_data/hourly/ozone/ozone_2006_hr.csv")
+
+# 2007 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20070101,
+               edate=20071231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2007_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2007_df, "data/air_data/hourly/ozone/ozone_2007_hr.csv")
+
+# 2008 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20080101,
+               edate=20081231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2008_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2008_df, "data/air_data/hourly/ozone/ozone_2008_hr.csv")
+
+# 2009 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20090101,
+               edate=20091231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2009_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2009_df, "data/air_data/hourly/ozone/ozone_2009_hr.csv")
+
+# 2010 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20100101,
+               edate=20101231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2010_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2010_df, "data/air_data/hourly/ozone/ozone_2010_hr.csv")
+
+# 2011 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20110101,
+               edate=20111231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2011_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2011_df, "data/air_data/hourly/ozone/ozone_2011_hr.csv")
+
+# 2012 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20120101,
+               edate=20121231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2012_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2012_df, "data/air_data/hourly/ozone/ozone_2012_hr.csv")
+
+# 2013 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20130101,
+               edate=20131231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2013_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2013_df, "data/air_data/hourly/ozone/ozone_2013_hr.csv")
+
+# 2014 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20140101,
+               edate=20141231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2014_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2014_df, "data/air_data/hourly/ozone/ozone_2014_hr.csv")
+
+# 2015 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20150101,
+               edate=20151231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2015_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2015_df, "data/air_data/hourly/ozone/ozone_2015_hr.csv")
+
+# 2016 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20160101,
+               edate=20161231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2016_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2016_df, "data/air_data/hourly/ozone/ozone_2016_hr.csv")
+
+# 2017 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20170101,
+               edate=20171231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2017_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2017_df, "data/air_data/hourly/ozone/ozone_2017_hr.csv")
+
+# 2018 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20180101,
+               edate=20181231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2018_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2018_df, "data/air_data/hourly/ozone/ozone_2018_hr.csv")
+
+# 2019 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=44201,
+               bdate=20190101,
+               edate=20191231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+ozone_2019_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = ozone_2019_df, "data/air_data/hourly/ozone/ozone_2019_hr.csv")
+
+# Full Data
+
+ozone_2006_2019_df <- do.call("rbind", list(ozone_2006_df, ozone_2007_df, ozone_2008_df, ozone_2009_df, ozone_2010_df, ozone_2011_df, ozone_2012_df, ozone_2013_df, ozone_2014_df, ozone_2015_df, ozone_2016_df, ozone_2017_df, ozone_2018_df, ozone_2019_df))
+
+ozone_2006_2019_df$date_time_local <- ymd_hm(paste(ozone_2006_2019_df$date_local, ozone_2006_2019_df$time_local), tz="EST")
+
+ozone_2006_2019_df$date_time_gmt <- ymd_hm(paste(ozone_2006_2019_df$date_gmt, ozone_2006_2019_df$time_gmt), tz = "GMT")
+
+ozone_2006_2019_df$date_time_gmt2 <- with_tz(ozone_2006_2019_df$date_time_local, tzone= "Europe/Athens") # This is Athens Time and is GMT+2
+
+ozone_2006_2019_df$date_time_gmt2_value <- paste(ozone_2006_2019_df$date_time_gmt2) # backup
+```
+
+#### Create Adjusted Ozone Date 
+
+The closing value for a day is reported at 4PM, so we adjust the ozone average for a day to start the day before at 4PM and end the day of at 4PM. We can do this by adjusting the date to GMT + 2 and then removing the timestamp.
+
+```{r, message=FALSE}
+ozone_2006_2019_df$snp_close_adjusted_date <- NA
+
+for(i in 1:nrow(ozone_2006_2019_df)) {
+ozone_2006_2019_df$snp_close_adjusted_date[i] <- paste(date(ozone_2006_2019_df$date_time_gmt2[i]))
+}
+
+ozone_2006_2019_df$snp_close_adjusted_date <- paste(date(ozone_2006_2019_df$snp_close_adjusted_date))
+
+write_csv(x = ozone_2006_2019_df, "data/air_data/hourly/ozone/ozone_2006_2019_df.csv")
+```
+
+```{r}
+datacheck <- read_csv("data/air_data/hourly/ozone/ozone_2006_2019_df.csv")
+```
+
+#### Data Check
+##### Missing
+```{r}
+
+ozone_2006_2019_df <- read_csv("data/air_data/hourly/ozone/ozone_2006_2019_df.csv")
+
+full_dates <- seq(as.Date("2007-06-13"), as.Date("2019-12-01"), by="days")
+full_dates <- as.data.frame(full_dates)
+colnames(full_dates)  <- "snp_close_adjusted_date"
+
+full_dates <- left_join(full_dates, ozone_2006_2019_df)
+
+full_dates <- full_dates[-c(1:15),]
+
+sum(is.na(full_dates$sample_measurement))
+```
+
+Between 2007-06-13 and 2019-12-01 we are missing 4362 hourly measurements. This makes a problem for calculating the sum and 8 hour averages.
+
+### Carbon Monoxide Hourly Values
+```{r}
+EPA_EMAIL <- Sys.getenv('EPA_EMAIL')
+EPA_KEY <- Sys.getenv('EPA_KEY')
+base_url <- "https://aqs.epa.gov/data/api/sampleData/bySite"
+
+# 2006 Data
+  args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20061220,
+               edate=20061231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+  #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2006_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2006_df, "data/air_data/hourly/CO/CO_2006_hr.csv")
+
+# 2007 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20070101,
+               edate=20071231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2007_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2007_df, "data/air_data/hourly/CO/CO_2007_hr.csv")
+
+# 2008 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20080101,
+               edate=20081231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2008_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2008_df, "data/air_data/hourly/CO/CO_2008_hr.csv")
+
+# 2009 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20090101,
+               edate=20091231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2009_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2009_df, "data/air_data/hourly/CO/CO_2009_hr.csv")
+
+# 2010 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20100101,
+               edate=20101231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2010_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2010_df, "data/air_data/hourly/CO/CO_2010_hr.csv")
+
+# 2011 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20110101,
+               edate=20111231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2011_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2011_df, "data/air_data/hourly/CO/CO_2011_hr.csv")
+
+# 2012 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20120101,
+               edate=20121231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2012_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2012_df, "data/air_data/hourly/CO/CO_2012_hr.csv")
+
+# 2013 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20130101,
+               edate=20131231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2013_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2013_df, "data/air_data/hourly/CO/CO_2013_hr.csv")
+
+# 2014 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20140101,
+               edate=20141231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2014_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2014_df, "data/air_data/hourly/CO/CO_2014_hr.csv")
+
+# 2015 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20150101,
+               edate=20151231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2015_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2015_df, "data/air_data/hourly/CO/CO_2015_hr.csv")
+
+# 2016 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20160101,
+               edate=20161231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2016_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2016_df, "data/air_data/hourly/CO/CO_2016_hr.csv")
+
+# 2017 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20170101,
+               edate=20171231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2017_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2017_df, "data/air_data/hourly/CO/CO_2017_hr.csv")
+
+# 2018 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20180101,
+               edate=20181231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2018_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2018_df, "data/air_data/hourly/CO/CO_2018_hr.csv")
+
+# 2019 Data
+args <- list(email=EPA_EMAIL, 
+               key= EPA_KEY,
+               param=42101,
+               bdate=20190101,
+               edate=20191231,
+               state="36",
+               county="061",
+               site="0135")
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+ # #status_code(res)
+  # Get the content and return it as a data.frame
+  raw_query <- content(res)
+
+CO_2019_df <- rbindlist(raw_query$Data, fill = TRUE)
+
+write_csv(x = CO_2019_df, "data/air_data/hourly/CO/CO_2019_hr.csv")
+
+# Full Data
+
+CO_2006_2019_df <- do.call("rbind", list(CO_2006_df, CO_2007_df, CO_2008_df, CO_2009_df, CO_2010_df, CO_2011_df, CO_2012_df, CO_2013_df, CO_2014_df, CO_2015_df, CO_2016_df, CO_2017_df, CO_2018_df, CO_2019_df))
+
+CO_2006_2019_df$date_time_local <- ymd_hm(paste(CO_2006_2019_df$date_local, CO_2006_2019_df$time_local), tz="EST")
+
+CO_2006_2019_df$date_time_gmt <- ymd_hm(paste(CO_2006_2019_df$date_gmt, CO_2006_2019_df$time_gmt), tz = "GMT")
+
+CO_2006_2019_df$date_time_gmt2 <- with_tz(CO_2006_2019_df$date_time_local, tzone= "Europe/Athens") # This is Athens Time and is GMT+2
+
+CO_2006_2019_df$date_time_gmt2_value <- paste(CO_2006_2019_df$date_time_gmt2) # backup
+
+```
+
+#### Create Adjusted Carbon Monoxide Date 
+
+The closing value for a day is reported at 4PM, so we adjust the CO average for a day to start the day before at 4PM and end the day of at 4PM. We can do this by adjusting the date to GMT + 2 and then removing the timestamp.
+
+```{r, message=FALSE}
+CO_2006_2019_df$snp_close_adjusted_date <- NA
+
+for(i in 1:nrow(CO_2006_2019_df)) {
+CO_2006_2019_df$snp_close_adjusted_date[i] <- paste(date(CO_2006_2019_df$date_time_gmt2[i]))
+}
+
+# CO_2006_2019_df$snp_close_adjusted_date <- as.Date(CO_2006_2019_df$snp_close_adjusted_date)
+
+write_csv(x = CO_2006_2019_df, "data/air_data/hourly/CO/CO_2006_2019_df.csv")
+```
+
+```{r}
+datacheck <- read_csv("data/air_data/hourly/CO/CO_2006_2019_df.csv")
+```
+
+#### Checks
+##### Missing
+```{r}
+
+CO_2006_2019_df <- read_csv("data/air_data/hourly/CO/CO_2006_2019_df.csv")
+
+full_dates <- seq(as.Date("2008-07-10"), as.Date("2020-01-01"), by="days")
+full_dates <- as.data.frame(full_dates)
+colnames(full_dates)  <- "snp_close_adjusted_date"
+
+full_dates <- left_join(full_dates, CO_2006_2019_df)
+
+#full_dates <- full_dates[-c(1:15),]
+
+sum(is.na(full_dates$sample_measurement))
+```
+
+Between 2008-07-10 and 2020-01-01 we are missing 3737 hourly measurements.
+
+## Weather
+
+Unfortunately the code below - while it works - obtains substandard and highly inconsistent data, with entire years of weather missing without explanation. I can only conclude that these are issues with the data collection.
+
+To combat this I will have to use the NOAA Laguardia site for weather observations, rather than the EPA site.
+
+## NOAA API
+I will use the NOAA website to get LGA hourly meteorlogical data.
+
+Use API v1 https://www.ncei.noaa.gov/support/access-data-service-api-user-documentation
+
+Example query:
+https://www.ncei.noaa.gov/access/services/data/v1?dataset=local-climatological-data&dataTypes=HourlyWindSpeed&stations=72503014732&startDate=2000-01-01&endDate=2020-02-29&format=csv
+
+#### Wind Speed
+```{r}
+NOAA_EMAIL <- Sys.getenv('NOAA_EMAIL')
+NOAA_KEY <- Sys.getenv('NOAA_KEY')
+base_url <- "https://www.ncei.noaa.gov/access/services/data/v1"
+
+# 2006-2019 Data
+  args <- list(email=NOAA_EMAIL, 
+               key= NOAA_KEY,
+               dataset = "local-climatological-data",
+               dataTypes = "HourlyWindSpeed",
+               stations = "72503014732",
+               startDate = "2006-12-21",
+               endDate = "2020-01-05"
+               )
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+  #status_code(res)
+  # Get the content and return it as a data.frame
+  wind_noaa_2006_2019_df <- content(res)
+
+write_csv(x = wind_noaa_2006_2019_df, "data/air_data/hourly/wind/wind_noaa_2006_2019_hr.csv")
+```
+
+#### Temperature
+```{r}
+NOAA_EMAIL <- Sys.getenv('NOAA_EMAIL')
+NOAA_KEY <- Sys.getenv('NOAA_KEY')
+base_url <- "https://www.ncei.noaa.gov/access/services/data/v1"
+
+# 2006-2019 Data
+  args <- list(email=NOAA_EMAIL, 
+               key= NOAA_KEY,
+               dataset = "local-climatological-data",
+               dataTypes = "HourlyTemperature",
+               stations = "72503014732",
+               startDate = "2006-12-21",
+               endDate = "2020-01-05"
+               )
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+  #status_code(res)
+  # Get the content and return it as a data.frame
+  temp_noaa_2006_2019_df <- content(res)
+
+write_csv(x = temp_noaa_2006_2019_df, "data/air_data/hourly/temp/temp_noaa_2006_2019_hr.csv")
+```
+
+## All Weather
+
+HourlyDewPointTemperature
+HourlyDryBulbTemperature
+HourlyPrecipitation
+HourlySeaLevelPressure
+HourlyStationPressure
+HourlyWindSpeed
+
+```{r}
+NOAA_EMAIL <- Sys.getenv('NOAA_EMAIL')
+NOAA_KEY <- Sys.getenv('NOAA_KEY')
+base_url <- "https://www.ncei.noaa.gov/access/services/data/v1"
+
+# 2006-2019 Data
+  args <- list(email=NOAA_EMAIL, 
+               key= NOAA_KEY,
+               dataset = "local-climatological-data",
+               stations = "72503014732",
+               startDate = "2006-12-21",
+               endDate = "2020-01-05"
+               )
+
+  res <- GET(base_url, query = compact(args))
+  # Check the result
+  #status_code(res)
+  # Get the content and return it as a data.frame
+  all_noaa_2006_2019_df <- content(res)
+
+
+```
+
+
+```{r}
+library(lubridate)
+tz(all_noaa_2006_2019_df$DATE) <- "EST"
+
+all_noaa_2006_2019_df$date_time_gmt2 <- with_tz(all_noaa_2006_2019_df$DATE, tzone= "Europe/Athens") # This is Athens Time and is GMT+2
+
+all_noaa_2006_2019_df$snp_close_adjusted_date <- NA
+
+for(i in 1:nrow(all_noaa_2006_2019_df)) {
+all_noaa_2006_2019_df$snp_close_adjusted_date[i] <- paste(date(all_noaa_2006_2019_df$date_time_gmt2[i]))
+}
+
+all_noaa_2006_2019_df <- all_noaa_2006_2019_df %>%
+  select(c("STATION","DATE","date_time_gmt2","snp_close_adjusted_date","REPORT_TYPE","SOURCE","HourlyDewPointTemperature","HourlyDryBulbTemperature","HourlySeaLevelPressure","HourlyStationPressure","HourlyWindSpeed","HourlySkyConditions", "HourlyPrecipitation"))
+
+```
+
+#### Cloud Coverage
+Cloud coverage is measured in "oktas" - an 0-8 scale indicating how much of the sky is covered by clouds (https://www1.ncdc.noaa.gov/pub/data/cdo/documentation/LCD_documentation.pdf). The NOAA measures three levels of cloud coverage, but we can use the okta measurements to find the densest layer, approximating the cloud coverage.
+
+```{r}
+all_noaa_2006_2019_df$HourlyCloudNumeric <- NA
+
+all_noaa_2006_2019_df <- all_noaa_2006_2019_df %>%
+  mutate(HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = "CLR"), 0.00, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":01"), 1/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":02"), 2/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":03"), 3/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":04"), 4/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":05"), 5/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":06"), 6/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":07"), 7/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = ":08"), 8/8, HourlyCloudNumeric),
+         HourlyCloudNumeric = ifelse(str_detect(string = HourlySkyConditions,pattern = "X"), NA, HourlyCloudNumeric))
+
+write_csv(x = all_noaa_2006_2019_df, "data/air_data/hourly/all_noaa_2006_2019_hr_SNP.csv")
+
+datacheck <- read_csv("data/air_data/hourly/all_noaa_2006_2019_hr_SNP.csv")
+```
+

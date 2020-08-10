@@ -1,0 +1,755 @@
+---
+title: "Inter Intra Day Data Prep with Queens Data"
+author: "Michael Weisner"
+date: "7/15/2020"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE,warning=FALSE)
+library(tinytex)
+library(kableExtra)
+library(qwraps2)
+library(stringr)
+library(jsonlite)
+library(httr)
+library(data.table)
+library(lubridate)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+options(qwraps2_markup = "markdown")
+```
+
+
+## Data for Model
+
+The data that we need to obtain includes the following daily variables:
+
+- The Dependent variable: S&P 500 percent return for each day that we have Particulate Matter 2.5 micrometers data (PM2.5)
+- Three lags of the dependent variable
+- The daily measure of fine particulate matter, PM2.5, measured from 4PM to 4PM intervals
+- - this is the equivalent of using GMT + 2 instead of New York's EST so that the hourly measurements appropriately match up for a 4PM to 4PM inclusive measurement
+- - even though gmt + 2 would have the time shift exactly at 4PM, the 4PM PM2.5 measurements are a 3PM to 4PM average, meaning if we include the 4PM measurement as the following day we're inappropriately adding the end of the last day to the start of the next.
+- Weather Conditions:
+- - Temperature
+- - Dew point
+- - Precipitation 
+- - Wind speed
+- - Air pressure
+- - Cloud cover
+- Other Pollutants:
+- - Daily mean measures of 1-hour ozone
+- - Daily mean measures 8-hour carbon monoxide 
+- Fixed Effects Variables:
+- - day of the week dummy variables to flexibly allow for different returns throughout the week. 
+- - A “tax dummy” that indicates the first five trading days and the last trading day of the tax year to account for tax-loss selling.
+- - A year-by-week dummy variables to capture seasonality and other temporal patterns
+- An error term that allows for arbitrary serial correlation within a week using Newey-West standard errors
+
+Because Hayes, Neidell, and Saberian defined a day not by the calendar but as the twenty four hour block of time from 4 PM one day to 4 PM the next, we can simply convert the time to a GMT + 2 timezone, which is 8 hours ahed of New York. This will get us the times that match up with the 4 PM to 4 PM trading cycle, and may be more accurate.
+
+## Fixed Effects Variables:
+### Day of the Week Dummy Variables (Sunday-Saturday)
+I will use the `weekdays()` to create a dummy variable for Sunday through Saturday.
+
+```{r}
+snp_fixed <- read_csv("data_inter_intra/yahoo_snp500_12.20.2006-1.1.2020.csv", col_names = TRUE)
+
+snp_fixed <- snp_fixed %>%
+  mutate(weekday = weekdays(Date)) %>%
+  mutate(Monday = ifelse(weekday == "Monday", 1, 0),
+         Tuesday = ifelse(weekday == "Tuesday", 1, 0),
+         Wednesday = ifelse(weekday == "Wednesday", 1, 0),
+         Thursday = ifelse(weekday == "Thursday", 1, 0),
+         Friday = ifelse(weekday == "Friday", 1, 0))
+
+#unique(snp_fixed$weekday)
+write_csv(snp_fixed, "data_inter_intra/snp_fixed_effects_2006-2020.csv")
+```
+
+
+
+### “Tax Dummy” 
+This indicates the first five trading days and the last trading day of the tax year to account for tax-loss selling.
+
+```{r}
+snp_fixed <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020.csv", col_names = TRUE)
+# snp_fixed <- snp_fixed %>%
+#   select(-X1)
+
+snp_fixed <- snp_fixed %>%
+  mutate(year = year(Date),
+         month = month(Date),
+         day = day(Date)) %>%
+  mutate(tax_dummy = ifelse((month == 12 & day == 31) | (month == 1 & (day == 1 | day == 2 | day == 3 | day == 4 | day == 5)), 1, 0))
+
+write_csv(snp_fixed, "data_inter_intra/snp_fixed_effects_2006-2020.csv")
+
+```
+
+
+### Year-by-week dummy variable
+```{r}
+snp_fixed <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020.csv", col_names = TRUE)
+# snp_fixed <- snp_fixed %>%
+#   select(-X1)
+
+
+snp_fixed <- snp_fixed %>%
+  mutate(week = week(snp_fixed$Date))
+
+snp_names <- colnames(snp_fixed)
+
+week_names <- c()
+for(i in 1:53){
+  week_names <- c(week_names, paste0("week_",i))}
+
+all_names <- c(snp_names, week_names)
+
+library(dummies)
+
+snp_fixed_week <- snp_fixed
+
+snp_fixed_week <- cbind(snp_fixed_week, dummy(snp_fixed_week$week, sep="_"))
+
+colnames(snp_fixed_week) <- all_names
+
+#snp_fixed_week <- snp_fixed_week %>%
+#  select(-c(week,weekday,year,month,day))
+
+write_csv(snp_fixed_week, "data_inter_intra/snp_fixed_effects_2006-2020.csv")
+```
+
+Now that we have the dummy variables we should remove the week and the weekday variables as well as the year, month, and date variables.
+
+#### S&P 500 Variables of Interest
+```{r}
+snp_fixed <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020.csv", col_names = TRUE)
+# snp_fixed <- snp_fixed %>%
+#   select(-X1)
+
+snp_analysis <- snp_fixed %>%
+  select(-c(Open, High,Low, `Adj Close`, Volume, weekday, year, month, day, week))
+
+write_csv(snp_analysis, "data_inter_intra/snp_analysis_variables_2006-2020.csv")
+```
+
+
+
+## Newey-West Standard Errors Error Term
+
+```{r}
+library(sandwich)
+```
+
+
+## PM2.5 2006 - 2019 Data Cleaning
+
+PM2.5 for New York City is the Environmental Protection Agency air monitor paramter 88502. We can use the EPA's API to extract the data  by calling that paramter for each year we need from the Air Quality Sruvey (AQS) API, specifying the lower Manhattan station with the values of `state` = 36, `county` = 061, and `site` = 0134. 
+
+### Quick PM2.5 Data Cleaning
+
+Based on a report by the [EPA AQS from 2011](https://19january2017snapshot.epa.gov/aqs/aqs-addendum-negative-values_.html), data below 0 should be replaced with null data rather than be replaced by 0 as it can introduce bias. Because of this that's what we will do for the data in this case.
+
+
+```{r}
+pm2.5_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/pm2.5/pm2.5_2006_2019_df.csv")
+
+negative_check <- pm2.5_2006_2019_df$sample_measurement[!is.na(pm2.5_2006_2019_df$sample_measurement) & pm2.5_2006_2019_df$sample_measurement < 0]
+
+length(negative_check)
+
+missing_values <- pm2.5_2006_2019_df$sample_measurement[is.na(pm2.5_2006_2019_df$sample_measurement)]
+
+length(missing_values)
+```
+
+Above shows us that there are 3120 negative sample values and 4236 missing values. This means a minimum of 7356 values are invalid in our dataset of 113251 values. Since it is a daily measurement starting on 2006-12-21 and ending on 2019-12-31 there are 4758 days. That means the theroetical maximum number of observations equal to $4758*24=114192$ samples.
+
+Since we have a total number of "valid" measurements of $113251-7356 = 105895$ days, or $105895/114192=0.9273417$, meaning we have a sample of covering about 92.7% of the total time elapsed.
+
+#### Making Negative Values NA
+
+```{r}
+pm2.5_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/pm2.5/pm2.5_2006_2019_df.csv")
+
+pm2.5_2006_2019_df$sample_measurement <- ifelse(pm2.5_2006_2019_df$sample_measurement < 0, NA, pm2.5_2006_2019_df$sample_measurement)
+
+length(na.omit(pm2.5_2006_2019_negNA$sample_measurement))
+
+write_csv(pm2.5_2006_2019_df, "data_inter_intra/air_data/hourly/pm2.5/pm2.5_2006_2019_df_negNA.csv")
+
+summary(pm2.5_2006_2019_df$sample_measurement)
+```
+
+#### Making Negative Values NA Check
+
+```{r}
+pm2.5_2006_2019_negNA <- read_csv("data_inter_intra/air_data/hourly/pm2.5/pm2.5_2006_2019_df_negNA.csv")
+
+pm2.5_2006_2019_negNA$sample_measurement <- ifelse(!is.na(pm2.5_2006_2019_df$sample_measurement) & pm2.5_2006_2019_df$sample_measurement < 0, NA, pm2.5_2006_2019_df$sample_measurement)
+
+length(na.omit(pm2.5_2006_2019_negNA$sample_measurement))
+```
+
+### Make Adjusted Daily PM2.5 Sum
+```{r, message=FALSE}
+pm2.5_2006_2019_negNA <- read_csv("data_inter_intra/air_data/hourly/pm2.5/pm2.5_2006_2019_df_negNA.csv")
+
+na_free_pm2.5 <- pm2.5_2006_2019_negNA[!is.na(pm2.5_2006_2019_df$sample_measurement), ]
+
+#detach(package:plyr)
+
+daily_sum_pm2.5 <- na_free_pm2.5 %>%
+  ungroup() %>%
+  group_by(snp_close_adjusted_date) %>%
+  summarize(sum_sample_measurement = sum(sample_measurement))
+
+#daily_average_pm2.5$gmt_2_date <- as.Date(daily_average_pm2.5$gmt_2_date)
+colnames(daily_sum_pm2.5) <- c("Date", "pm2.5_Daily_Sum_UGPM3")
+
+write_csv(daily_sum_pm2.5, "data_inter_intra/air_data/hourly/pm2.5/daily_sum_pm2.5_nafree.csv")
+
+datacheck <- read_csv("data_inter_intra/air_data/hourly/pm2.5/daily_sum_pm2.5_nafree.csv")
+head(datacheck)
+```
+
+## Weather Conditions:
+
+I collected the data from NOAA Laguardia Airport.
+
+#### Make Adjusted Hourly ozone Average per Day
+```{r, message=FALSE}
+all_noaa_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/all_noaa_2006_2019_hr_SNP.csv")
+
+daily_average_weather <- all_noaa_2006_2019_df %>%
+  group_by(snp_close_adjusted_date) %>%
+  summarize(mean_dewpoint_tempF = mean(na.omit(HourlyDewPointTemperature)),
+            mean_hr_tempF = mean(na.omit(HourlyDryBulbTemperature)),
+            mean_hr_pressure_psi = mean(na.omit(HourlySeaLevelPressure)),
+            mean_hr_windspeed_knots = mean(na.omit(HourlyWindSpeed)),
+            mean_hr_precip_in = mean(na.omit(as.numeric(HourlyPrecipitation))),
+            mean_hr_clouds_percent = mean(na.omit((HourlyCloudNumeric))))
+
+# Should I use sum_hr_precip_in = sum(na.omit(as.numeric(HourlyPrecipitation))),
+
+colnames(daily_average_weather) <- c("Date", "mean_hr_dewpoint_tempF", "mean_hr_tempF", "mean_hr_pressure_psi", "mean_hr_windspeed_knots", "mean_hr_precip_in", "mean_hr_clouds_percent")
+
+write_csv(daily_average_weather, "data_inter_intra/air_data/hourly/weather/daily_average_weather.csv")
+
+datacheck <- read_csv("data_inter_intra/air_data/hourly/weather/daily_average_weather.csv")
+```
+
+
+## Other Pollutants:
+
+### Site 36-061-0135
+Unfortunately, contradictory to the working paper, site 36-061-0134 has never collected data for ozone nor carbon monoxide. Site 36-061-0135 does collect both of this data, however. While not a perfect proxy for the conditions on Wall Street, it is the best measurement to use without the original data available.
+
+However, site 36-061-0135 does not have ozone measurements before June 13, 2007. 
+
+### Ozone 
+
+#### Data Cleaning
+
+##### Negative Check
+```{r}
+ozone_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/ozone/ozone_2006_2019_df.csv")
+
+negative_check <- ozone_2006_2019_df$sample_measurement[!is.na(ozone_2006_2019_df$sample_measurement) & ozone_2006_2019_df$sample_measurement < 0]
+
+length(negative_check)
+```
+
+So no negative values.
+
+##### Missing Check
+
+###### Manhattan 
+```{r}
+ozone_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/ozone/ozone_2006_2019_df.csv")
+
+missing_values <- ozone_2006_2019_df$sample_measurement[is.na(ozone_2006_2019_df$sample_measurement)]
+
+summary(ozone_2006_2019_df$snp_close_adjusted_date)
+length(missing_values)
+```
+The manhattan data is missing 4376 hourly measurements on top of missing about 6 months of measurements from at the start.
+
+###### Queens
+```{r}
+ozone_QUEENS_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/ozone/ozone_2006_2019_df_QUEENS.csv")
+
+missing_values <- ozone_QUEENS_2006_2019_df$sample_measurement[is.na(ozone_2006_2019_df$sample_measurement)]
+
+summary(ozone_QUEENS_2006_2019_df$snp_close_adjusted_date)
+length(missing_values)
+```
+The Queens data has only 4534 missing values of hourly measurements for Ozone between 2006-12-21 and 2020-01-01.
+
+##### Join Manhattan and Queens Data
+
+```{r}
+full_dates <- seq(as.Date("2006-12-21"), as.Date("2020-01-01"), by="days")
+full_dates <- as.data.frame(full_dates)
+colnames(full_dates)  <- "snp_close_adjusted_date"
+
+full_dates <- left_join(full_dates, ozone_2006_2019_df)
+
+full_dates_NAs <- as.data.frame(full_dates[is.na(full_dates$state_code), 1])
+
+colnames(full_dates_NAs) <- c("snp_close_adjusted_date")
+
+full_dates_NA_filled <- left_join(full_dates_NAs, ozone_QUEENS_2006_2019_df)
+
+full_dates$Queens_Data <- 0
+full_dates_NA_filled$Queens_Data <- 1
+
+full_dates_noNA <- full_dates[!is.na(full_dates$state_code), ]
+
+full_dates_joined <- rbind(full_dates_noNA, full_dates_NA_filled)
+
+write_csv(full_dates_joined, "data_inter_intra/air_data/hourly/ozone/ozone_2006_2019_df_negNA_joined.csv")
+
+ sum(is.na(full_dates_joined$sample_measurement))
+```
+
+
+##### Make Negatives NA
+
+There are no negative values
+```{r}
+ozone_full_dates <- read_csv("data_inter_intra/air_data/hourly/ozone/ozone_2006_2019_df_negNA_joined.csv")
+
+summary(ozone_full_dates$sample_measurement)
+summary(ozone_full_dates$snp_close_adjusted_date)
+```
+
+There are still no NA values
+
+#### Make 8 Hour Averages
+Ozone exposure is measured in 8 hour averages - so we should get the total exposure over the previous 8 hours for each hour and then average it for the day?
+https://www3.epa.gov/region1/airquality/avg8hr.html
+
+```{r}
+library(dplyr)
+ozone_full_dates <- ozone_full_dates %>%
+  mutate(ozone_lag1 = lag(sample_measurement, 1),
+         ozone_lag2 = lag(sample_measurement, 2),
+         ozone_lag3 = lag(sample_measurement, 3),
+         ozone_lag4 = lag(sample_measurement, 4),
+         ozone_lag5 = lag(sample_measurement, 5),
+         ozone_lag6 = lag(sample_measurement, 6),
+         ozone_lag7 = lag(sample_measurement, 7)) %>%
+  rowwise() %>%
+         mutate(ozone_8hr = sum(c(sample_measurement, ozone_lag1, ozone_lag2, ozone_lag3, ozone_lag4, ozone_lag5, ozone_lag6, ozone_lag7)))
+
+```
+
+
+#### Make Adjusted Daily 8Hour ozone Average
+```{r, message=FALSE}
+na_free_ozone <- ozone_full_dates[!is.na(ozone_full_dates$sample_measurement), ]
+
+daily_average_ozone <- na_free_ozone %>%
+  group_by(snp_close_adjusted_date) %>%
+  summarize(mean_sample_measurement = mean(ozone_8hr, na.rm = TRUE),
+            Queens_Data = max(Queens_Data))
+
+#daily_average_ozone$gmt_2_date <- as.Date(daily_average_ozone$gmt_2_date)
+colnames(daily_average_ozone) <- c("Date", "ozone_Daily_8hr_Average_PPM", "Queens Ozone Data")
+
+write_csv(daily_average_ozone, "data_inter_intra/air_data/hourly/ozone/daily_8hr_avg_ozone_nafree_joined.csv")
+
+datacheck <- read_csv("data_inter_intra/air_data/hourly/ozone/daily_8hr_avg_ozone_nafree_joined.csv")
+```
+
+If the daily average uses any Queens data I have designated Queens Data to be 1 (TRUE).
+
+#### Check
+
+```{r}
+nrow((daily_average_ozone))
+```
+
+```{r}
+sum(is.na(daily_average_ozone$ozone_Daily_8hr_Average_PPM))
+```
+
+If we sum sum and average over 8 hours without removing NA values we are missing 26 out of the 4661 total. While it might not be a perfect 8 hour exposure average due to missing hourly measurements, it seems reasonable:
+
+```{r}
+summary(daily_average_ozone$ozone_Daily_8hr_Average_PPM)
+```
+
+### Carbon Monoxide
+One hour carbon monoxide measurements from site 36-061-0135 again.
+AQI code is 42101.
+
+#### Data Cleaning
+
+##### Negative Check Manhattan
+
+```{r}
+CO_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/CO/CO_2006_2019_df.csv")
+
+summary(CO_2006_2019_df$sample_measurement)
+summary(CO_2006_2019_df$snp_close_adjusted_date)
+```
+
+There are some negative values and many NA values.
+```{r}
+negative_check <- CO_2006_2019_df$sample_measurement[!is.na(CO_2006_2019_df$sample_measurement) & CO_2006_2019_df$sample_measurement < 0]
+
+length(negative_check)
+```
+There are 237 negative values we have to replace with NA
+
+```{r}
+ggplot(CO_2006_2019_df, aes(x = snp_close_adjusted_date, y = sample_measurement)) +
+  geom_point()
+```
+
+
+##### Negative Check Queens
+```{r}
+CO_QUEENS_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/CO/CO_2006_2019_df_QUEENS.csv")
+
+negative_check <- CO_QUEENS_2006_2019_df$sample_measurement[!is.na(CO_QUEENS_2006_2019_df$sample_measurement) & CO_QUEENS_2006_2019_df$sample_measurement < 0]
+
+length(negative_check)
+```
+
+No negatives!
+
+```{r}
+ggplot(CO_QUEENS_2006_2019_df, aes(x = snp_close_adjusted_date, y = sample_measurement)) +
+  geom_point()
+```
+
+
+
+##### Missing Check Manhattan
+```{r}
+missing_values <- CO_2006_2019_df$sample_measurement[is.na(CO_2006_2019_df$sample_measurement)]
+
+length(missing_values)
+```
+
+There are 3736 missing values.
+
+##### Missing Check Queens
+```{r}
+missing_values <- CO_QUEENS_2006_2019_df$sample_measurement[is.na(CO_QUEENS_2006_2019_df$sample_measurement)]
+
+length(missing_values)
+```
+
+There are 5666 missing values in Queens.
+
+###### Making Manhattan Negative Values NA
+
+```{r}
+CO_2006_2019_df <- read_csv("data_inter_intra/air_data/hourly/CO/CO_2006_2019_df.csv")
+
+CO_2006_2019_df$sample_measurement <- ifelse(CO_2006_2019_df$sample_measurement < 0, NA, CO_2006_2019_df$sample_measurement)
+
+write_csv(CO_2006_2019_df, "data_inter_intra/air_data/hourly/CO/CO_2006_2019_df_negNA.csv")
+
+summary(CO_2006_2019_df$sample_measurement)
+```
+
+```{r}
+ggplot(CO_2006_2019_df, aes(x = snp_close_adjusted_date, y = sample_measurement)) +
+  geom_point()
+```
+
+We have to remove values equal to 0 or lower because there's clearly issues later on in the measurements
+
+```{r}
+CO_2006_2019_negNA <- read_csv("data_inter_intra/air_data/hourly/CO/CO_2006_2019_df_negNA.csv")
+
+
+# Must remove 2017
+# CO_2006_2019_negNA$sample_measurement <- ifelse(!is.na(CO_2006_2019_negNA$sample_measurement) & (CO_2006_2019_negNA$sample_measurement < 0 | year(CO_2006_2019_negNA$date_local) == 2017), NA, CO_2006_2019_negNA$sample_measurement)
+
+
+CO_2006_2019_negNA$sample_measurement <- ifelse(!is.na(CO_2006_2019_negNA$sample_measurement) & (CO_2006_2019_negNA$sample_measurement < 0 | year(CO_2006_2019_negNA$date_local) == 2017), NA, CO_2006_2019_negNA$sample_measurement)
+
+#length(na.omit(CO_2006_2019_negNA$sample_measurement))
+summary(CO_2006_2019_negNA$sample_measurement)
+```
+
+So we end up with 3973 NA values for the manhattan data on top of missing about 2 years of data at the start.
+
+We must also remove 2017 because the measurements are clearly messed up.
+
+```{r}
+ggplot(CO_2006_2019_negNA, aes(x = snp_close_adjusted_date, y = sample_measurement)) +
+  geom_point()
+```
+
+#### Join Queens Data
+
+```{r}
+library(dplyr)
+full_dates <- seq(as.Date("2006-12-21"), as.Date("2020-01-01"), by="days")
+full_dates <- as.data.frame(full_dates)
+colnames(full_dates)  <- "snp_close_adjusted_date"
+
+full_dates <- left_join(full_dates, CO_2006_2019_negNA)
+
+full_dates_NAs <- as.data.frame(full_dates[is.na(full_dates$sample_measurement), 1])
+
+colnames(full_dates_NAs) <- c("snp_close_adjusted_date")
+
+full_dates_NA_filled <- left_join(x=full_dates_NAs, y=CO_QUEENS_2006_2019_df, by="snp_close_adjusted_date")
+
+full_dates$Queens_Data <- NA
+full_dates_NA_filled$Queens_Data <- 1
+
+full_dates_noNA <- full_dates[!is.na(full_dates$state_code), ]
+
+full_dates_joined <- rbind(full_dates_noNA, full_dates_NA_filled)
+
+full_dates_joined$Queens_Data[is.na(full_dates_joined$Queens_Data)] <- 0
+
+write_csv(full_dates_joined, "data_inter_intra/air_data/hourly/CO/CO_2006_2019_df_negNA_joined.csv")
+
+ggplot(full_dates_joined, aes(x = snp_close_adjusted_date, y = sample_measurement, color=Queens_Data)) +
+  geom_point()
+
+```
+
+```{r}
+summary(full_dates_joined$sample_measurement)
+```
+
+
+
+#### Make 8 Hour Averages
+CO exposure is measured in 8 hour averages - so we should get the total exposure over the previous 8 hours for each hour and then average it for the day?
+https://www3.epa.gov/region1/airquality/avg8hr.html
+
+```{r}
+library(dplyr)
+CO_2006_2019_df_joined <- read_csv("data_inter_intra/air_data/hourly/CO/CO_2006_2019_df_negNA_joined.csv")
+
+ggplot(CO_2006_2019_df_joined, aes(x = snp_close_adjusted_date, y = sample_measurement)) +
+  geom_point()
+```
+
+```{r}
+CO_2006_2019_df_joined <- CO_2006_2019_df_joined %>%
+  mutate(CO_lag1 = lag(sample_measurement, 1),
+         CO_lag2 = lag(sample_measurement, 2),
+         CO_lag3 = lag(sample_measurement, 3),
+         CO_lag4 = lag(sample_measurement, 4),
+         CO_lag5 = lag(sample_measurement, 5),
+         CO_lag6 = lag(sample_measurement, 6),
+         CO_lag7 = lag(sample_measurement, 7)) %>%
+  rowwise() %>%
+         mutate(CO_8hr = sum(c(sample_measurement, CO_lag1, CO_lag2, CO_lag3, CO_lag4, CO_lag5, CO_lag6, CO_lag7)))
+
+```
+
+#### Make Adjusted Daily 8hr CO Average
+```{r, message=FALSE}
+
+na_free_CO <- CO_2006_2019_df_joined[!is.na(CO_2006_2019_df_joined$sample_measurement), ]
+
+daily_average_CO_PPM <- na_free_CO %>%
+  group_by(snp_close_adjusted_date) %>%
+  summarize(mean_sample_measurement = mean(CO_8hr, na.rm=TRUE),
+            Queens_Data = max(Queens_Data))
+
+#daily_average_CO$gmt_2_date <- as.Date(daily_average_CO$gmt_2_date)
+colnames(daily_average_CO_PPM) <- c("Date", "CO_Daily_8hr_Average_PPM", "Queens CO Data")
+
+write_csv(daily_average_CO_PPM, "data_inter_intra/air_data/hourly/CO/daily_8hr_avg_CO_nafree_joined.csv")
+
+datacheck <- read_csv("data_inter_intra/air_data/hourly/CO/daily_8hr_avg_CO_nafree_joined.csv")
+```
+
+```{r}
+ggplot(datacheck, aes(x = Date, y = CO_Daily_8hr_Average_PPM, color = factor(`Queens CO Data`))) +
+  geom_point()
+```
+
+
+### Data check
+```{r}
+nrow(daily_average_CO_PPM)
+```
+
+
+```{r}
+sum(is.na(daily_average_CO_PPM$CO_Daily_8hr_Average_PPM))
+```
+
+If we sum sum and average over 8 hours and remove NA values we are missing 32 out of the 4661 total. While it might not be a perfect 8 hour exposure average due to missing hourly measurements, it seems reasonable:
+
+```{r}
+summary(daily_average_CO_PPM$CO_Daily_8hr_Average_PPM)
+```
+
+
+## Quick Info
+
+### PM2.5
+```{r}
+pm2.5_2006_2019_negNA %>%
+  select(sample_measurement, units_of_measure) %>%
+summary_table()
+```
+
+
+## Final Data Assembly
+
+### S&P with PM2.5
+Here we load in the S&P 500 data from 12/20/2006-1/1/2020 (the PM2.5 data we have with a slight buffer).
+```{r, eval=FALSE}
+snp_fixed <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020.csv", col_names = TRUE)
+
+#snp_fixed <- read_csv("data_inter_intra/snp_analysis_variables_2006-2020.csv", col_names = TRUE)
+
+
+# snp_fixed <- snp_fixed %>%
+#   select(-c(X1,weekday, week, year, month, day))
+
+snp_fixed <- snp_fixed %>%
+  select(-c(Open, High,Low, `Adj Close`, Volume, weekday, year, month, day, week))
+
+daily_sum_pm2.5_nafree <- read_csv("data_inter_intra/air_data/hourly/pm2.5/daily_sum_pm2.5_nafree.csv")
+
+snp_pm2.5 <- left_join(snp_fixed, daily_sum_pm2.5_nafree,"Date")
+
+#snp_pm2.5 <- snp_pm2.5[!is.na(snp_pm2.5$pm2.5_Daily_Average), ]
+
+# snp_pm2.5 <- snp_pm2.5 %>%
+#   select(-X1)
+
+
+# ggplot(snp_pm2.5, aes(x=pm2.5_Daily_Average, y=Close)) +
+#   geom_point() +
+#   geom_smooth(method = "lm") +
+#   theme_fivethirtyeight() +
+#   xlab("Daily Average PM2.5 Concentration (PM2.5)") +
+#   ylab("Closing S&P Value") +
+#   ggtitle("Linear Model of S&P Close & PM2.5 Daily Average Concentration")
+```
+
+
+
+### Calculating S&P 500 daily percentage returns
+
+You can calculate returns either through the change in opening to closing values or between days. As we are using daily measures, the closing value is the definitive value of the day's stock values. Similar to Saunders (2003) we will calculate the daily percentage returns by comparing each day's closing value to the closing value of the previous day. Doing so captures any changes in valuation that occurs after the market closes and would be more accurate than the trading within the open and closing values.
+
+Interday % change = (Closing Value - Previous Day's Closing Value) ÷ Previous Day's Closing Value × 100.
+Intraday % change = (Closing Value - Opening Value) ÷ Opening Value x 100
+
+
+```{r}
+snp_fixed <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020.csv", col_names = TRUE)
+
+snp_fixed <- snp_fixed %>%
+  mutate(Close_lag1 = lag(Close, 1),
+         Close_lag2 = lag(Close, 2),
+         Return_perc_interday = (((Close - Close_lag1)/Close_lag1) * 100),
+         Return_perc_interday_lag1 = lag(Return_perc_interday, 1), 
+         Return_perc_interday_lag2 = lag(Return_perc_interday, 2),
+         Return_perc_intraday = (((Close - Open)/Open) * 100),
+         Return_perc_intraday_lag1 = lag(Return_perc_intraday, 1),
+         Return_perc_intraday_lag2 = lag(Return_perc_intraday, 2))
+
+snp_fixed <- snp_fixed %>%
+  select(c(Date, Close, Close_lag1, Close_lag2, Return_perc_interday, Return_perc_interday_lag1, Return_perc_interday_lag2, Return_perc_intraday, Return_perc_intraday_lag1, Return_perc_intraday_lag2, everything()))
+
+snp_fixed <- snp_fixed %>%
+  select(-c(Open, High,Low, `Adj Close`, Volume, weekday, year, month, day, week))
+
+write_csv(snp_fixed, "data_inter_intra/snp_fixed_effects_2006-2020_inter_intra.csv")
+```
+
+
+### VIX Data
+I had to get daily VIX data form http://www.cboe.com/products/vix-index-volatility/vix-options-and-futures/vix-index/vix-historical-data as it was not publically available on factset.com.
+
+I chose to use the closing value as I was using closing value for the S&P.
+```{r}
+snp_fixed <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020_inter_intra.csv", col_names = TRUE)
+
+# snp_fixed <- snp_fixed %>%
+#   select(-c(Close_lag1, Close_lag2))
+# 
+# write_csv(snp_fixed, "data_inter_intra/snp_fixed_effects_2006-2020_inter_intra.csv")
+
+vix <- read_csv("data_inter_intra/vixcurrent.csv", col_names = TRUE)
+vix$Date <- mdy(vix$Date)
+
+vix_close <- vix %>%
+  select(c(Date, `VIX Close`))
+
+colnames(vix_close) <- c("Date", "VIX_Close")
+
+snp_vix <- left_join(snp_fixed, vix_close)
+
+snp_vix <- snp_vix %>%
+  select(c(Date, Close, Close_lag1, Close_lag2, Return_perc_interday, Return_perc_interday_lag1, Return_perc_interday_lag2, Return_perc_intraday, Return_perc_intraday_lag1, Return_perc_intraday_lag2, VIX_Close, everything()))
+
+write_csv(snp_vix, "data_inter_intra/snp_fixed_effects_2006-2020_VIX_inter_intra.csv")
+```
+
+### Final Data
+```{r}
+snp_vix <- read_csv("data_inter_intra/snp_fixed_effects_2006-2020_VIX_inter_intra.csv", col_names = TRUE)
+
+snp_vix <- snp_vix %>%
+  select(-c(Close_lag1, Close_lag2))
+
+daily_pm2.5 <- read_csv("data_inter_intra/air_data/hourly/pm2.5/daily_sum_pm2.5_nafree.csv")
+daily_weather <- read_csv("data_inter_intra/air_data/hourly/weather/daily_average_weather.csv")
+daily_ozone <- read_csv("data_inter_intra/air_data/hourly/ozone/daily_8hr_avg_ozone_nafree_joined.csv")
+daily_CO <- read_csv("data_inter_intra/air_data/hourly/CO/daily_8hr_avg_CO_nafree_joined.csv")
+
+snp_complete <- left_join(snp_vix, daily_pm2.5)
+snp_complete <- left_join(snp_complete, daily_ozone)
+snp_complete <- left_join(snp_complete, daily_CO)
+snp_complete <- left_join(snp_complete, daily_weather)
+
+snp_complete <- snp_complete %>%
+  mutate(pm2.5_Daily_Lag1 = lag(pm2.5_Daily_Sum_UGPM3, n=1L),
+         pm2.5_Daily_Lag2 = lag(pm2.5_Daily_Sum_UGPM3, n=2L))
+
+write_csv(snp_complete, "data_inter_intra/JOINED_snp_complete_NAs_close_inter_intra.csv")
+
+snp_complete_noclose <- snp_complete %>%
+  select(-Close)
+
+write_csv(snp_complete_noclose, "data_inter_intra/JOINED_snp_complete_NAs_noclose_inter_intra.csv")
+
+snp_complete_noNA <- snp_complete[complete.cases(snp_complete), ]
+
+write_csv(snp_complete_noNA, "data_inter_intra/JOINED_snp_complete_NONAs_close_inter_intra.csv")
+
+snp_complete_noNA_noclose <- snp_complete_noNA %>%
+  select(-Close)
+
+write_csv(snp_complete_noNA_noclose, "data_inter_intra/JOINED_snp_complete_NONAs_noclose_inter_intra.csv")
+
+snp_complete_noNA_noRec <- snp_complete_noNA %>%
+  filter(as.Date(Date) < as.Date("2008-10-01") | as.Date(Date) > as.Date("2008-12-31"))
+
+write_csv(snp_complete_noNA_noRec, "data_inter_intra/JOINED_snp_complete_noNA_noRec_close_inter_intra.csv")
+
+snp_complete_noNA_noRec_noclose <- snp_complete_noNA_noRec %>%
+  select(-Close)
+
+write_csv(snp_complete_noNA_noRec_noclose, "data_inter_intra/JOINED_snp_complete_noNA_noRec_noclose_inter_intra.csv")
+
+```
+
+We can first attempt using only complete cases for our first round of analysis.
