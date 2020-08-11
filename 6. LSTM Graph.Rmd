@@ -217,21 +217,21 @@ gg_lstm_norm
 #### No Scale version
 
 ```{r}
-lstm_true_noscale = read.csv("./LSTM/lstm_true_values_noscale.csv")
-lstm_true_noscale = lstm_true_noscale %>%
-  select(X0)
-
-colnames(lstm_true_noscale) <- "Return_perc_interday"
-
-lstm_pred_noscale = read.csv("./LSTM/lstm_predicted_values_noscale.csv")
-lstm_pred_noscale = lstm_pred_noscale %>%
-  select(X0)
-
-colnames(lstm_pred_noscale) <- "predictions"
-
-lstm_full_noscale <- cbind(lstm_true_noscale, lstm_pred_noscale)
-
-lstm_full_noscale$Date <- rf_comparisons$Date[39:630]
+# lstm_true_noscale = read.csv("./LSTM/lstm_true_values_noscale.csv")
+# lstm_true_noscale = lstm_true_noscale %>%
+#   select(X0)
+# 
+# colnames(lstm_true_noscale) <- "Return_perc_interday"
+# 
+# lstm_pred_noscale = read.csv("./LSTM/lstm_predicted_values_noscale.csv")
+# lstm_pred_noscale = lstm_pred_noscale %>%
+#   select(X0)
+# 
+# colnames(lstm_pred_noscale) <- "predictions"
+# 
+# lstm_full_noscale <- cbind(lstm_true_noscale, lstm_pred_noscale)
+# 
+# lstm_full_noscale$Date <- rf_comparisons$Date[39:630]
 ```
 
 ```{r}
@@ -240,32 +240,32 @@ nrow(lstm_full_noscale)
 ```
 
 ```{r}
-lstm_full_long_noscale <- lstm_full_noscale %>%
-  gather("key", "value", -Date)
-
-
-lstm_full_long_noscale <- lstm_full_long_noscale %>%
-  mutate(key = ifelse(key == "Return_perc", "1. True Return %", key)) %>%
-  mutate(key = ifelse(key == "predictions", "2. Predicted Return %", key))
-
-
-library(plyr)
-
-gg_lstm_noscale <- ggplot(lstm_full_long_noscale) +
-  theme_fivethirtyeight_mw() +
-  geom_line(aes(x=Date, y = value, color = key), alpha = 1, 
-             subset = .(key == '2. Predicted Return %')) +
-  geom_line(aes(x=Date, y = value, color = key), alpha = 0.5, 
-             subset = .(key == '1. True Return %')) +
-  scale_color_manual(values = c("darkgrey", "blue"), labels = c("True Return %", "Predicted Return %")) +
-  xlab("Date") +
-  ylab("No Scale S&P Return Value") +
-  ggtitle("LSTM - Actual vs Predicted S&P 500 Return %")
- 
-
-ggsave(filename = "actualvspredicted_lstm_noscale.png", plot = gg_lstm_noscale, path = "graphs/", width = 6.5, height = 4, units = "in", dpi = 300)
-
-gg_lstm_noscale
+# lstm_full_long_noscale <- lstm_full_noscale %>%
+#   gather("key", "value", -Date)
+# 
+# 
+# lstm_full_long_noscale <- lstm_full_long_noscale %>%
+#   mutate(key = ifelse(key == "Return_perc", "1. True Return %", key)) %>%
+#   mutate(key = ifelse(key == "predictions", "2. Predicted Return %", key))
+# 
+# 
+# library(plyr)
+# 
+# gg_lstm_noscale <- ggplot(lstm_full_long_noscale) +
+#   theme_fivethirtyeight_mw() +
+#   geom_line(aes(x=Date, y = value, color = key), alpha = 1, 
+#              subset = .(key == '2. Predicted Return %')) +
+#   geom_line(aes(x=Date, y = value, color = key), alpha = 0.5, 
+#              subset = .(key == '1. True Return %')) +
+#   scale_color_manual(values = c("darkgrey", "blue"), labels = c("True Return %", "Predicted Return %")) +
+#   xlab("Date") +
+#   ylab("No Scale S&P Return Value") +
+#   ggtitle("LSTM - Actual vs Predicted S&P 500 Return %")
+#  
+# 
+# ggsave(filename = "actualvspredicted_lstm_noscale.png", plot = gg_lstm_noscale, path = "graphs/", width = 6.5, height = 4, units = "in", dpi = 300)
+# 
+# gg_lstm_noscale
 
 ```
 
@@ -326,7 +326,7 @@ gg_lstm_adjusted
 
 Final Val root mean squared error: 0.7845
 
-## RMSE of predicting 0
+## RMSE of predicting 0 (Baseline)
 ```{r}
 lstm_full_adjusted <- lstm_full_adjusted %>%
   mutate(zero = 0)
@@ -336,3 +336,17 @@ RMSE(pred = lstm_full_adjusted$zero, obs = lstm_full_adjusted$Return_perc_interd
 ```
 
 Above is the RMSE of predicting 0 every time (0.8046852).
+
+
+### Sanity Test
+I wanted to get the RMSE of the original, unscaled data to see if it is the same as the adjusted and scaled data at the end. The values are the same so we can be sure that the RMSE of 0.8046852 is correct.
+```{r}
+actual_values <- snp_complete_joined_noNA_noRec$Return_perc_interday[(nrow(snp_complete_joined_noNA_noRec)-591):nrow(snp_complete_joined_noNA_noRec)]
+
+actual_values <- as.data.frame(actual_values) %>%
+  mutate(zero = 0)
+
+RMSE(pred = actual_values$zero, obs = actual_values$actual_values)
+```
+
+
